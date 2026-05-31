@@ -1,0 +1,121 @@
+name: Build Minimal FFmpeg with MSVC (LGPL)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  build:
+    runs-on: windows-2025
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            make
+            diffutils
+            nasm
+
+      - name: Configure and Compile FFmpeg (MSVC)
+        shell: msys2 {0}
+        env:
+          MSYS2_PATH_TYPE: inherit
+        run: |
+          if [ -f /usr/bin/link ]; then mv /usr/bin/link /usr/bin/link.bak; fi
+          export INCLUDE="${INCLUDE};${WINDOWSSDKDIR}Include/${WINDOWSSDKVERSION}shared;${WINDOWSSDKDIR}Include/${WINDOWSSDKVERSION}um"
+
+          ./configure \
+            --prefix=./build_out \
+            --toolchain=msvc \
+            --target-os=win64 \
+            --arch=x86_64 \
+            --x86asmexe=nasm \
+            --enable-static \
+            --disable-everything \
+            --disable-version3 \
+            --disable-gpl \
+            --disable-nonfree \
+            --disable-doc \
+            --disable-htmlpages \
+            --disable-manpages \
+            --disable-podpages \
+            --disable-txtpages \
+            --enable-network \
+            --enable-protocol=rtmp,rtmps,tcp,udp,file,http,https,tls,tls_schannel  \
+            --enable-demuxer=flv,mpegts,mov,rawvideo,image2,pcm_f32le \
+            --enable-muxer=flv,mpegts,mp4,rawvideo \
+            --enable-indev=gdigrab,dshow,lavfi \
+            --enable-encoder=h264_mf,aac_mf,hevc_mf,aac \
+            --enable-decoder=h264_mf,aac_mf,h264,aac,rawvideo,pcm_f32le \
+            --enable-parser=h264,aac,aac_latm \
+            --enable-filter=ddagrab,gfxcapture,scale,format,fps,aresample,volume \
+            --enable-d3d11va \
+            --enable-ffmpeg \
+            --disable-ffplay \
+            --disable-ffprobe
+
+          make -j$(nproc)
+          make install
+
+      - name: Upload config.log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-config-log
+          path: ffbuild/config.log
+
+      - name: Upload FFmpeg Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-msvc-minimal
+          path: build_out/bin/ffmpeg.exe
+
+      # 5. バージョン情報でライセンス・機能テスト
+      - name: Verify License and Features (Auto Test)
+        shell: pwsh
+        run: |
+          $ffmpegPath = "build_out/bin/ffmpeg.exe"
+          if (-not (Test-Path $ffmpegPath)) {
+              Write-Error "❌ Error: ffmpeg.exe が生成されていません。"
+          }
+
+          $ffmpegInfo = & $ffmpegPath -version 2>&1 | Out-String
+          Write-Host "=== FFmpeg Build Info ==="
+          Write-Host $ffmpegInfo
+          Write-Host "========================="
+
+          # GPLの表記が「含まれていない」ことを確認する
+          if ($ffmpegInfo -match "license: GPL") {
+              Write-Error "❌ Error: バイナリがGPLライセンスとして判定されています！"
+          } else {
+              Write-Host "✅ Success: GPL表記なし（LGPLクリア）。"
+          }
+
+          # configure オプションに予期せぬ文字が入っていないかダブルチェック
+          if ($ffmpegInfo -match "--enable-gpl" -or $ffmpegInfo -match "--enable-nonfree") {
+              Write-Error "❌ Error: 設定内にGPL/Nonfreeの有効化オプションが検出されました！"
+          }
+
+          # 配信機能の生存チェック
+          $encodersInfo = & $ffmpegPath -encoders 2>&1 | Out-String
+          if ($encodersInfo -match "h264_mf") {
+              Write-Host "✅ Success: h264_mf エンコーダーが利用可能です。"
+          } else {
+              Write-Error "❌ Error: h264_mf エンコーダーが組み込まれていません！"
+          }

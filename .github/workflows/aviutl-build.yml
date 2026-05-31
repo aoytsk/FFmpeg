@@ -64,8 +64,9 @@ jobs:
             --enable-encoder=h264_mf,aac_mf,hevc_mf,aac,rawvideo,pcm_f32le \
             --enable-decoder=h264_mf,aac_mf,h264,aac,rawvideo,pcm_f32le \
             --enable-parser=h264,aac,aac_latm \
-            --enable-filter=ddagrab,gfxcapture,scale,format,fps,aresample,volume \
+            --enable-filter=hwdownload,ddagrab,gfxcapture,scale,format,fps,aresample,volume \
             --enable-d3d11va \
+            --enable-dxva2 \
             --enable-ffmpeg \
             --disable-ffplay \
             --disable-ffprobe

@@ -59,9 +59,9 @@ jobs:
             --enable-network \
             --enable-protocol=rtmp,rtmps,tcp,udp,file,http,https,tls,tls_schannel  \
             --enable-demuxer=flv,mpegts,mov,rawvideo,image2,pcm_f32le \
-            --enable-muxer=flv,mpegts,mp4,rawvideo \
+            --enable-muxer=flv,mpegts,mp4,rawvideo,pcm_f32le \
             --enable-indev=gdigrab,dshow,lavfi \
-            --enable-encoder=h264_mf,aac_mf,hevc_mf,aac \
+            --enable-encoder=h264_mf,aac_mf,hevc_mf,aac,rawvideo,pcm_f32le \
             --enable-decoder=h264_mf,aac_mf,h264,aac,rawvideo,pcm_f32le \
             --enable-parser=h264,aac,aac_latm \
             --enable-filter=ddagrab,gfxcapture,scale,format,fps,aresample,volume \
